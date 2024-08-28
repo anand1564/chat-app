@@ -1,0 +1,9 @@
+
+#Ignore the env files
+.env
+
+#Ignore the prisma schema file
+schema.prisma
+
+#Ignore the node_modules
+node_modules
