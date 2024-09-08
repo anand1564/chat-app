@@ -5,6 +5,8 @@ import Signup from './components/Signup'
 import {io} from 'socket.io-client'
 import { useEffect } from 'react'
 import Home from './components/Home'
+import { AuthProvider } from './context/authContext'
+import Login from './components/login'
 function App() {
 const socket=io('http://localhost:3000')
 useEffect(()=>{
@@ -19,14 +21,15 @@ return ()=>{
 }
 },[]);
   return (
-    <>
+    <AuthProvider>
     <BrowserRouter>
     <Routes>
       <Route path="/" element={<Home/>} />
       <Route path="/signup" element={<Signup/>} />
+      <Route path="/login" element={<Login/>} />
     </Routes>
     </BrowserRouter>
-    </>
+    </AuthProvider>
   )
 }
 
