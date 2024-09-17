@@ -29,4 +29,5 @@ io.on('connection',()=>{
 
 server.listen(3000,()=>{
     console.log('Server started on port 3000');
+    console.log(process.env.DATABASE_URL);
 })

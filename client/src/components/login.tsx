@@ -22,16 +22,24 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const user = await axios.post("http://localhost:3000/users/login", formData);
-      if (user.status === 200) {
+      const response = await axios.post("http://localhost:3000/users/login", formData);
+      if (response.status === 200) {
         setIsLoggedIn(true);
         navigate('/');
+      } else {
+        alert("Login failed: " + response.statusText);
       }
-    } catch (error) {
-      console.log(error);
-      alert("Login Failed");
+    } catch (error: any) {
+      // Checking if the error has a response and providing detailed feedback
+      if (error.response) {
+        console.log(error.response.data);
+        alert(`Login Failed: ${error.response.data.message || "An error occurred"}`);
+      } else {
+        console.log(error.message);
+        alert("Login Failed: An error occurred");
+      }
     }
-  };
+  };  
 
   return (
     <div className="flex justify-center min-h-screen items-center bg-slate-900">

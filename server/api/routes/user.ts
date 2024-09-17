@@ -31,7 +31,7 @@ userRouter.get('/',async(req,res)=>{
     const users = await prisma.user.findMany();
     res.json(users);
 })
-userRouter.get('/login',async(req,res)=>{
+userRouter.post('/login',async(req,res)=>{
     const {email,password} = req.body;
     if(!email || !password){
         return res.status(400).json({ message: "Email and password are required" });
