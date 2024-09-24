@@ -1,35 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 
 const ChatRoom = () => {
-  const socket = io('http://localhost:3000');
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<string[]>([]); // Array to store messages
+  const [messages, setMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    socket.on('connect', () => {
+    // Create a single socket instance and save it to the state
+    const newSocket = io('http://localhost:3000');
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
       console.log('A user connected');
     });
 
-    socket.on('disconnect', () => {
+    newSocket.on('disconnect', () => {
       console.log('A user disconnected');
     });
 
     // Listen for incoming messages
-    socket.on('message', (newMessage: string) => {
+    newSocket.on('message', (newMessage: string) => {
       setMessages((prevMessages) => [...prevMessages, newMessage]);
     });
 
+    // Clean up when component unmounts
     return () => {
-      socket.disconnect();
+      newSocket.disconnect();
     };
   }, []);
 
   const handleMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      socket.emit('message', message); // Send message to server
-      setMessages((prevMessages) => [...prevMessages, message]); // Add the message locally
+    if (message.trim() && socket) {
+      socket.emit('message', message); // Send message to the server
       setMessage(''); // Clear input field
     }
   };

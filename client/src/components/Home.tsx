@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authContext';
-import { BackgroundLines } from './ui/background-lines';
 import Signup from './Signup';
-import { button } from 'framer-motion/client';
 
 const Home = () => {
   const { isLoggedIn } = useAuth();

@@ -23,8 +23,16 @@ app.use("/users",userRouter);
 app.get('/',(req: Request,res: Response)=>{
     res.send('Server is running');
 });
-io.on('connection',()=>{
+io.on('connection',(socket)=>{
     console.log('a user connected');
+
+    socket.on('message',(message: String)=>{
+        console.log('message');
+        io.emit('message',message)
+    })
+    socket.on('disconnect',()=>{
+        console.log('a user disconnected');
+    })
 })
 
 server.listen(3000,()=>{
