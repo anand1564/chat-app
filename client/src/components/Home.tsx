@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authContext';
 import Signup from './Signup';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MessageCircle, Users, ArrowRight } from 'lucide-react';
 
 const Home = () => {
   const { isLoggedIn } = useAuth();
@@ -10,12 +15,12 @@ const Home = () => {
     roomName: '',
     password: ''
   });
-  const [joinData,setJoinData] = useState({
-    roomId:'',
+  const [joinData, setJoinData] = useState({
+    roomId: '',
     password: ''
   });
 
-  const createRoom = async (e:React.FormEvent) => {
+  const createRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const response = await fetch('http://localhost:3000/chatRooms/create', {
@@ -35,62 +40,67 @@ const Home = () => {
       console.error('Failed to create room:', error);
     }
   };
-  const handleJoin = async(e:React.FormEvent)=>{
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const response = await fetch('http://localhost:3000/chatRooms/join',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json'
+    const response = await fetch('http://localhost:3000/chatRooms/join', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       },
-      body:JSON.stringify(joinData)
+      body: JSON.stringify(joinData)
     });
-    if(response.ok){
+    if (response.ok) {
       console.log('Room joined');
       navigate('/chatRoom/:id');
-     }else{
+    } else {
       window.alert('Error Joining Room');
-     }
-}
+    }
+  }
 
   return (
     <div className="relative min-h-screen bg-gray-900 text-white">
-      
-      <div className="relative z-10 container mx-auto p-6">
+
+      <div className="flex items-center justify-center min-h-screen">
         {isLoggedIn ? (
-          <div className="space-y-8">
-            <h1 className="text-4xl font-bold text-center text-white">Welcome to Chat Rooms</h1>
-            
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h2 className="text-2xl font-semibold mb-4">Create a Chat Room</h2>
-              <form onSubmit={createRoom} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Room Name"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                  onChange={(e) => setCreateData({...createData, roomName: e.target.value})}
-                />
-                <input
-                  type="password"
-                  placeholder="Enter the password"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                  onChange={(e) => setCreateData({...createData, password: e.target.value})}
-                />
-                <button type="submit" className="w-full">
-                  Create Room
-                </button>
-              </form>
-            </div>
-            
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h2 className="text-2xl font-semibold mb-4">Join a Chat Room</h2>
-              <form className='space-y-4' onSubmit={handleJoin}>
-                <input type='text' placeholder='Room ID' className='w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white' onChange={(e)=>setJoinData({...joinData,roomId: e.target.value})}/>
-                <input type='password' placeholder='Enter the password' className='w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white' onChange={(e)=>setJoinData({...joinData,password: e.target.value})}/>
-                <button className='w-full'>Join Room</button>
-              </form>
-              <p className="text-gray-400">Room joining functionality coming soon...</p>
-            </div>
-          </div>
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center">Welcome to ChatApp</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="create" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="create">
+                    <MessageCircle className="mr-2 h-4 w-4" /> Create Room
+                  </TabsTrigger>
+                  <TabsTrigger value="join">
+                    <Users className="mr-2 h-4 w-4" /> Join Room
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="create" className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Enter room name"
+                    onChange={(e) => setCreateData({ ...createData, roomName: e.target.value })}
+                  />
+                  <Input type="text" placeholder='Create a password' onChange={(e) => setCreateData({ ...createData, password: e.target.value })} />
+                  <Button onClick={createRoom} className="w-full">
+                    Create Room <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </TabsContent>
+                <TabsContent value="join" className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Enter Room Id"
+                    onChange={(e) => setJoinData({ ...joinData, roomId: e.target.value })}
+                  />
+                  <Input type="text" placeholder="Enter password" onChange={(e) => setJoinData({ ...joinData, password: e.target.value })} />
+                  <Button onClick={handleJoin} className="w-full">
+                    Join Room <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         ) : (
           <Signup />
         )}
