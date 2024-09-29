@@ -1,6 +1,7 @@
 import { METHODS } from "http";
 import router from "./api/routes/chatRoom";
 import userRouter from "./api/routes/user";
+import msgRouter from "./api/routes/messages";
 import { Request,Response } from "express";
 const express = require('express');
 const http = require('http');
@@ -20,9 +21,11 @@ app.use(express.json()); // Parses incoming requests with JSON payloads
 app.use(express.urlencoded({ extended: true }));
 app.use("/chatRooms",router);
 app.use("/users",userRouter);
+app.use("/messages",msgRouter);
 app.get('/',(req: Request,res: Response)=>{
     res.send('Server is running');
 });
+//@ts-ignore
 io.on('connection',(socket)=>{
     console.log('a user connected');
 
