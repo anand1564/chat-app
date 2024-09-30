@@ -38,7 +38,7 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-700">
+    <div className="flex justify-center items-center min-h-screen bg-slate-900">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h2 className="text-2xl font-bold text-center mb-6">Chat Room</h2>
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
