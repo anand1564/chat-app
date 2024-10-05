@@ -34,17 +34,18 @@ router.get('/:chatRoomId', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/create', async (req: CreateMessageRequest, res: Response) => {
-    const { chatRoom, sender, content } = req.body;
+router.post('/create/:id', async (req: CreateMessageRequest, res: Response) => {
+    const {roomId} = req.params;
+    const { sender, content } = req.body;
 
-    if (!chatRoom || !sender || !content) {
+    if ( !sender || !content) {
         return res.status(400).json({ error: "chatRoom, sender, and content are required" });
     }
 
     try {
         const message = await prisma.message.create({
             data: {
-                chatRoomId: chatRoom, 
+                chatRoomId: roomId, 
                 userId: sender,       
                 content: content,
             },

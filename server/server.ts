@@ -19,7 +19,7 @@ const io = new Server(server,{
 app.use(cors());
 app.use(express.json()); // Parses incoming requests with JSON payloads
 app.use(express.urlencoded({ extended: true }));
-app.use("/chatRooms",router);
+app.use("/chatRoom",router);
 app.use("/users",userRouter);
 app.use("/messages",msgRouter);
 app.get('/',(req: Request,res: Response)=>{

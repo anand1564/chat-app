@@ -31,6 +31,43 @@ router.post('/join', async(req,res)=>{
   if(!passwordMatch){
     return res.status(401).json({error:'Incorrect password'});
   }
-  res.json({message:'Welcome to the room'});
+  res.json({message:'Welcome to the room',roomId:room.id});
 })
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Fetch the chat room by ID
+  const room = await prisma.chatRoom.findUnique({
+    where: {
+      id: id,
+    },
+  });
+  
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+
+  // Fetch messages in the chat room
+  const messages = await prisma.message.findMany({
+    where: {
+      chatRoomId: id,
+    },
+  });
+
+  // Extract unique user IDs from the messages
+  const userIds = [...new Set(messages.map((message) => message.userId))];
+
+  // Fetch user details for the extracted user IDs
+  const users = await prisma.user.findMany({
+    where: {
+      id: {
+        in: userIds,
+      },
+    },
+  });
+
+  // Return the chat room, users, and messages
+  res.json({ room, users, messages });
+});
+
 export default router;

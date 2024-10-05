@@ -23,7 +23,7 @@ const Home = () => {
   const createRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3000/chatRooms/create', {
+      const response = await fetch('http://localhost:3000/chatRoom/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ const Home = () => {
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const response = await fetch('http://localhost:3000/chatRooms/join', {
+    const response = await fetch('http://localhost:3000/chatRoom/join', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -51,8 +51,10 @@ const Home = () => {
       body: JSON.stringify(joinData)
     });
     if (response.ok) {
+      const res=await response.json();
+      const roomId=res.roomId;
       console.log('Room joined');
-      navigate('/chatRoom/:id');
+      navigate(`/chatRoom/${roomId}`);
     } else {
       window.alert('Error Joining Room');
     }
