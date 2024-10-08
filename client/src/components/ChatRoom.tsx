@@ -19,14 +19,14 @@ const ChatRoom = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const roomId = 'your-room-id';  // Replace this with your actual room ID
-  const userId = 'your-user-id';  // Replace this with the actual user ID
+  const roomId = '3c4f9946-b156-404a-be8f-039c955e4d30';  // Replace this with your actual room ID
+  const userId = 'ce06b02b-5146-46a6-a892-106582cec208';  // Replace this with the actual user ID
 
   // Fetch chat room details and user list when the component mounts
   useEffect(() => {
     const fetchChatRoomData = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/chatRooms/${roomId}`);
+        const response = await fetch(`http://localhost:3000/chatRoom/${roomId}`);
         const data = await response.json();
         
         setUsers(data.users);         // Set the user list from API response
@@ -43,33 +43,34 @@ const ChatRoom = () => {
   useEffect(() => {
     const newSocket = io('http://localhost:3000');
     setSocket(newSocket);
-
+  
+    newSocket.emit('join', roomId);
+  
     newSocket.on('connect', () => {
-      console.log('A user connected');
+      console.log('Connected to server');
     });
-
-    newSocket.on('disconnect', () => {
-      console.log('A user disconnected');
-    });
-
-    // Listen for incoming messages
+  
     newSocket.on('message', (newMessage: Message) => {
       setMessages((prevMessages) => [...prevMessages, newMessage]);
     });
-
-    // Clean up when component unmounts
+  
     return () => {
       newSocket.disconnect();
     };
-  }, []);
-
-  // Handle message submission
+  }, [roomId]);
+  
   const handleMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && socket) {
+      const newMessage = {
+        roomId,
+        sender: userId,
+        content: message,
+      };
+  
       // Emit the message to the socket
-      socket.emit('message', { sender: userId, content: message });
-
+      socket.emit('message', newMessage);
+  
       // Send the message to the backend to store in the database
       try {
         const response = await fetch(`http://localhost:3000/messages/create/${roomId}`, {
@@ -79,9 +80,9 @@ const ChatRoom = () => {
           },
           body: JSON.stringify({ sender: userId, content: message }),
         });
-
+  
         const data = await response.json();
-
+  
         if (response.ok) {
           console.log('Message stored in DB:', data);
         } else {
@@ -90,7 +91,7 @@ const ChatRoom = () => {
       } catch (error) {
         console.error('Error sending message:', error);
       }
-
+  
       setMessage(''); // Clear input field
     }
   };

@@ -26,17 +26,23 @@ app.get('/',(req: Request,res: Response)=>{
     res.send('Server is running');
 });
 //@ts-ignore
-io.on('connection',(socket)=>{
+io.on('connection', (socket) => {
     console.log('a user connected');
-
-    socket.on('message',(message: String)=>{
-        console.log('message');
-        io.emit('message',message)
-    })
-    socket.on('disconnect',()=>{
-        console.log('a user disconnected');
-    })
-})
+  
+    socket.on('join', (roomId:any) => {
+      socket.join(roomId);
+      console.log(`User joined room ${roomId}`);
+    });
+  
+    socket.on('message', (message:any) => {
+      console.log('message received:', message);
+      io.to(message.roomId).emit('message', message);
+    });
+  
+    socket.on('disconnect', () => {
+      console.log('a user disconnected');
+    });
+  });
 
 server.listen(3000,()=>{
     console.log('Server started on port 3000');

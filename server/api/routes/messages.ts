@@ -34,7 +34,7 @@ router.get('/:chatRoomId', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/create/:id', async (req: CreateMessageRequest, res: Response) => {
+router.post('/create/:roomId', async (req: CreateMessageRequest, res: Response) => {
     const {roomId} = req.params;
     const { sender, content } = req.body;
 

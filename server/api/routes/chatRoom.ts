@@ -37,15 +37,15 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
   // Fetch the chat room by ID
-  const room = await prisma.chatRoom.findUnique({
-    where: {
-      id: id,
-    },
-  });
+  // const room = await prisma.chatRoom.findUnique({
+  //   where: {
+  //     id: id,
+  //   },
+  // });
   
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
-  }
+  // if (!room) {
+  //   return res.status(404).json({ error: 'Room not found' });
+  // }
 
   // Fetch messages in the chat room
   const messages = await prisma.message.findMany({
@@ -67,7 +67,7 @@ router.get('/:id', async (req, res) => {
   });
 
   // Return the chat room, users, and messages
-  res.json({ room, users, messages });
+  res.json({ id, users, messages });
 });
 
 export default router;
