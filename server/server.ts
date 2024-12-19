@@ -38,6 +38,15 @@ io.on('connection', (socket) => {
       console.log('message received:', message);
       io.to(message.roomId).emit('message', message);
     });
+    socket.on("signal", (data:any) => {
+      io.to(data.target).emit("signal", { signal: data.signal, from: socket.id });
+    });
+  
+    // Notify other users
+    socket.on("join-room", (roomId:string) => {
+      socket.join(roomId);
+      io.to(roomId).emit("user-joined", socket.id);
+    });
   
     socket.on('disconnect', () => {
       console.log('a user disconnected');
