@@ -1,62 +1,86 @@
-import React, { useRef, useState, useEffect } from "react";
-import io from "socket.io-client";
-import Peer from "simple-peer";
+import React, { useEffect, useRef, useState } from 'react';
+import io from 'socket.io-client';
+import SimplePeer from 'simple-peer';
 
-const socket = io("http://localhost:3000");
+import { Buffer } from 'buffer';
+import process from 'process';
+window.Buffer = Buffer;
+window.process = process;
 
-const VideoChat = () => {
-  const [myId, setMyId] = useState("");
-  const [peerId, setPeerId] = useState("");
-  const myVideo = useRef();
-  const peerVideo = useRef();
-  const connectionRef = useRef();
+
+const socket = io('http://localhost:5000'); // Connect to signaling server
+
+const VideoChat: React.FC<{ roomId: string }> = ({ roomId }) => {
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const peerRef = useRef<SimplePeer.Instance | null>(null);
 
   useEffect(() => {
-    socket.on("connect", () => setMyId(socket.id || ""));
-    socket.on("signal", ({ signal, from }) => {
-      const peer = new Peer({ initiator: false, trickle: false });
-      peer.signal(signal);
+    // Get local media stream
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        setLocalStream(stream);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+      })
+      .catch((err) => console.error('Error accessing media devices:', err));
 
-      peer.on("signal", (signal) => {
-        socket.emit("signal", { signal, target: from });
+    // Join the room
+    socket.emit('join-room', roomId);
+
+    // Handle incoming signals
+    socket.on('signal', (data: { signal: any, senderId: string }) => {
+      if (peerRef.current) {
+        peerRef.current.signal(data.signal);
+      }
+    });
+
+    // Handle new user connection
+    socket.on('user-connected', (userId: string) => {
+      const peer = new SimplePeer({
+        initiator: true,
+        stream: localStream!,
+        trickle: false,
       });
 
-      peer.on("stream", (stream) => {
-        if (peerVideo.current) peerVideo.current.srcObject = stream;
+      peer.on('signal', (signal) => {
+        socket.emit('signal', { roomId, signal, senderId: socket.id });
       });
 
-      connectionRef.current = peer;
+      peer.on('stream', (stream) => {
+        setRemoteStream(stream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = stream;
+        }
+      });
+
+      peerRef.current = peer;
     });
 
-    socket.on("user-joined", (userId) => setPeerId(userId));
-  }, []);
-
-  const startCall = () => {
-    const peer = new Peer({ initiator: true, trickle: false });
-
-    peer.on("signal", (signal) => {
-      socket.emit("signal", { signal, target: peerId });
+    // Handle user disconnect
+    socket.on('user-disconnected', (userId: string) => {
+      if (peerRef.current) {
+        peerRef.current.destroy();
+        peerRef.current = null;
+        setRemoteStream(null);
+      }
     });
 
-    peer.on("stream", (stream) => {
-      if (peerVideo.current) peerVideo.current.srcObject = stream;
-    });
-
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      if (myVideo.current) myVideo.current.srcObject = stream;
-      peer.addStream(stream);
-    });
-
-    connectionRef.current = peer;
-  };
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
+      }
+      socket.disconnect();
+    };
+  }, [roomId]);
 
   return (
     <div>
-      <div>
-        <video ref={myVideo} autoPlay muted />
-        <video ref={peerVideo} autoPlay />
-      </div>
-      <button onClick={startCall}>Start Call</button>
+      <video ref={localVideoRef} autoPlay muted />
+      <video ref={remoteVideoRef} autoPlay />
     </div>
   );
 };

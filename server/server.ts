@@ -9,6 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const {Server}= require('socket.io');
 const cors = require('cors');
+window.global=window;
 
 const io = new Server(server,{
     cors:{
@@ -29,8 +30,9 @@ app.get('/',(req: Request,res: Response)=>{
 io.on('connection', (socket) => {
     console.log('a user connected');
   
-    socket.on('join', (roomId:any) => {
+    socket.on('join-room', (roomId:any) => {
       socket.join(roomId);
+      socket.to(roomId).emit('user-connected', socket.id);
       console.log(`User joined room ${roomId}`);
     });
   
