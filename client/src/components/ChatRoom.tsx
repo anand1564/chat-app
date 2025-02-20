@@ -1,154 +1,121 @@
-import React, { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import React, { useState, useEffect, useRef } from 'react';
+import io from 'socket.io-client';
+import Peer from 'simple-peer';
 
-type User = {
-  id: string;
-  name: string;
-};
+const socket = io('http://localhost:5000');
 
-type Message = {
-  id: string;
-  content: string;
-  userId: string;
-  chatRoomId: string;
-  createdAt: string;
-};
-
-const ChatRoom = () => {
-  const [socket, setSocket] = useState<Socket | null>(null);
+const ChatRoom: React.FC = () => {
+  const [roomName, setRoomName] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const roomId = '3c4f9946-b156-404a-be8f-039c955e4d30';  // Replace this with your actual room ID
-  const userId = 'ce06b02b-5146-46a6-a892-106582cec208';  // Replace this with the actual user ID
+  const [messages, setMessages] = useState<string[]>([]);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [peers, setPeers] = useState<{ [key: string]: Peer.Instance }>({});
 
-  // Fetch chat room details and user list when the component mounts
-  useEffect(() => {
-    const fetchChatRoomData = async () => {
-      try {
-        const response = await fetch(`http://localhost:3000/chatRoom/${roomId}`);
-        const data = await response.json();
-        
-        setUsers(data.users);         // Set the user list from API response
-        setMessages(data.messages);   // Set the messages from API response
-      } catch (error) {
-        console.error('Error fetching chat room data:', error);
-      }
-    };
-    
-    fetchChatRoomData();
-  }, [roomId]);
+  const myVideo = useRef<HTMLVideoElement>(null);
+  const peersRef = useRef<{ [key: string]: Peer.Instance }>({});
 
-  // Create socket connection
   useEffect(() => {
-    const newSocket = io('http://localhost:3000');
-    setSocket(newSocket);
-  
-    newSocket.emit('join', roomId);
-  
-    newSocket.on('connect', () => {
-      console.log('Connected to server');
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
+      setLocalStream(stream);
+      if (myVideo.current) myVideo.current.srcObject = stream;
     });
-  
-    newSocket.on('message', (newMessage: Message) => {
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
+
+    socket.on('user-connected', (userId) => {
+      const peer = new Peer({ initiator: true, stream: localStream! });
+      peer.on('signal', (signal) => {
+        socket.emit('signal', userId, signal);
+      });
+      peersRef.current[userId] = peer;
+      setPeers({ ...peersRef.current });
     });
-  
+
+    socket.on('receive-signal', (signal) => {
+      const peer = new Peer({ initiator: false, stream: localStream! });
+      peer.on('signal', (signal) => {
+        socket.emit('return-signal', signal);
+      });
+      peer.signal(signal);
+      peersRef.current[signal.id] = peer;
+      setPeers({ ...peersRef.current });
+    });
+
+    socket.on('receive-message', (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+
     return () => {
-      newSocket.disconnect();
+      socket.disconnect();
     };
-  }, [roomId]);
-  
-  const handleMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && socket) {
-      const newMessage = {
-        roomId,
-        sender: userId,
-        content: message,
-      };
-  
-      // Emit the message to the socket
-      socket.emit('message', newMessage);
-  
-      // Send the message to the backend to store in the database
-      try {
-        const response = await fetch(`http://localhost:3000/messages/create/${roomId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ sender: userId, content: message }),
-        });
-  
-        const data = await response.json();
-  
-        if (response.ok) {
-          console.log('Message stored in DB:', data);
-        } else {
-          console.error('Error storing message:', data.error);
-        }
-      } catch (error) {
-        console.error('Error sending message:', error);
-      }
-  
-      setMessage(''); // Clear input field
-    }
+  }, []);
+
+  const createRoom = async () => {
+    const response = await fetch('http://localhost:5000/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: roomName, password }),
+    });
+    const data = await response.json();
+    setRoomId(data.id);
+    socket.emit('join-room', data.id);
+  };
+
+  const joinRoom = async () => {
+    const response = await fetch('http://localhost:5000/rooms/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: roomName, password }),
+    });
+    const data = await response.json();
+    setRoomId(data.id);
+    socket.emit('join-room', data.id);
+  };
+
+  const sendMessage = () => {
+    socket.emit('send-message', roomId, message);
+    setMessages((prev) => [...prev, message]);
+    setMessage('');
   };
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar - 1/3rd of the screen */}
-      <div className="w-1/3 bg-gray-800 text-white p-4">
-        <h2 className="text-xl font-bold">User list</h2>
-        <div>
-          {users.length > 0 ? (
-            <ul>
-              {users.map((user) => (
-                <li key={user.id} className="p-2 bg-gray-700 rounded-md my-2">
-                  {user.name}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No users in the room</p>
-          )}
-        </div>
+    <div>
+      <h1>Video Chat App</h1>
+      <div>
+        <input
+          type="text"
+          placeholder="Room Name"
+          value={roomName}
+          onChange={(e) => setRoomName(e.target.value)}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button onClick={createRoom}>Create Room</button>
+        <button onClick={joinRoom}>Join Room</button>
       </div>
-
-      {/* Chat Room - 2/3rd of the screen */}
-      <div className="w-2/3 bg-gray-900 flex flex-col">
-        <h2 className="text-2xl font-bold text-white p-4">Chat Room</h2>
-
-        {/* Messages Container */}
-        <div className="flex-1 p-4 overflow-y-auto text-white space-y-2">
-          {messages.length > 0 ? (
-            messages.map((msg) => (
-              <div key={msg.id} className="bg-gray-700 p-2 rounded-md">
-                {msg.content}
-              </div>
-            ))
-          ) : (
-            <p>No messages yet</p>
-          )}
-        </div>
-
-        {/* Input Field and Send Button at the bottom */}
-        <form onSubmit={handleMessage} className="p-4 bg-gray-800 flex">
-          <input
-            type="text"
-            className="flex-1 p-2 bg-gray-700 text-white rounded-md"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your message..."
-          />
-          <button
-            type="submit"
-            className="ml-2 p-2 bg-blue-500 rounded-md text-white hover:bg-blue-600"
-          >
-            Send
-          </button>
-        </form>
+      <div>
+        <video ref={myVideo} autoPlay muted />
+        {Object.keys(peers).map((peerId) => (
+          <video key={peerId} autoPlay ref={(ref) => ref && (ref.srcObject = peers[peerId].stream)} />
+        ))}
+      </div>
+      <div>
+        <input
+          type="text"
+          placeholder="Type a message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
+      <div>
+        {messages.map((msg, index) => (
+          <div key={index}>{msg}</div>
+        ))}
       </div>
     </div>
   );
