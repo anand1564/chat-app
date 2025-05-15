@@ -1,6 +1,6 @@
-import React from 'react';
-import { Users, Video, Zap, Shield, Globe, MessageSquare } from 'lucide-react';
 
+import { Users, Video, Zap, Shield, Globe, MessageSquare } from 'lucide-react';
+import Navbar from './ui/Navbar';
 const Home = () => {
   return (
     <div className="min-h-screen bg-gray-900">
@@ -12,6 +12,7 @@ const Home = () => {
           backgroundSize: '40px 40px',
         }}
       />
+      <Navbar />
 
       {/* Hero Section */}
       <div className="relative">

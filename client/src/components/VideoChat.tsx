@@ -40,6 +40,7 @@ const VideoChat: React.FC<{ roomId: string }> = ({ roomId }) => {
 
     // Handle new user connection
     socket.on('user-connected', (userId: string) => {
+      console.log(userId);
       const peer = new SimplePeer({
         initiator: true,
         stream: localStream!,
@@ -62,7 +63,9 @@ const VideoChat: React.FC<{ roomId: string }> = ({ roomId }) => {
 
     // Handle user disconnect
     socket.on('user-disconnected', (userId: string) => {
+      console.log(userId);
       if (peerRef.current) {
+        console.log(remoteStream);
         peerRef.current.destroy();
         peerRef.current = null;
         setRemoteStream(null);

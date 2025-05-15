@@ -8,29 +8,40 @@ generator client {
 }
 
 model Room {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
+  id        Int           @id @default(autoincrement())
+  name      String        @unique
   password  String
-  createdAt DateTime @default(now())
-  users     User[]   @relation(references: [id]) // Implicit many-to-many relation
-  messages  Message[] // Relation to messages
+  createdAt DateTime      @default(now())
+  users     UsersInRooms[] // Relation to the join table
+  messages  Message[]     // Relation to messages
 }
 
 model User {
-  id              String     @id @default(uuid())
-  username        String
-  email           String     @unique
-  hashedPassword  String
-  chatRooms       Room[]     @relation(references: [id]) // Implicit many-to-many relation
-  messages        Message[]  // Relation to messages
+  id             String         @id @default(uuid())
+  username       String
+  email          String         @unique
+  hashedPassword String
+  rooms          UsersInRooms[] // Relation to the join table
+  messages       Message[]      // Relation to messages
+}
+
+// Join table for the many-to-many relation between User and Room
+model UsersInRooms {
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  roomId    Int
+  joinedAt  DateTime @default(now())
+
+  @@id([userId, roomId]) // Composite primary key
 }
 
 model Message {
-  id        String   @id @default(uuid())
-  content   String
-  sender    User     @relation(fields: [userId], references: [id])
-  userId    String
-  chatRoom  Room     @relation(fields: [chatRoomId], references: [id])
+  id         String   @id @default(uuid())
+  content    String
+  sender     User     @relation(fields: [userId], references: [id])
+  userId     String
+  chatRoom   Room     @relation(fields: [chatRoomId], references: [id])
   chatRoomId Int
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 }

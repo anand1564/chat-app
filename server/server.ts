@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import userRouter from './api/routes/user';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -11,6 +12,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
+app.use('/auth',userRouter);
 
 // Create a room
 app.post('/rooms', async (req, res) => {
@@ -20,7 +22,7 @@ app.post('/rooms', async (req, res) => {
 });
 
 // Join a room
-app.post('/rooms/join', async (req, res) => {
+app.post('/room/join', async (req, res) => {
   const { name, password } = req.body;
   const room = await prisma.room.findUnique({ where: { name } });
   if (!room || room.password !== password) {

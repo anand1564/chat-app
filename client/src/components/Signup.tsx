@@ -24,7 +24,7 @@ const Signup: React.FC = () => {
     e.preventDefault();
     setError(null); // Reset error state
     try {
-      const response = await axios.post("http://localhost:3000/users/signup", formData);
+      const response = await axios.post("http://localhost:3000/auth/signup", formData);
       if (response.status === 200) {
         setIsLoggedIn(true);  // Update login state
         navigate('/');  // Use navigate for redirection
