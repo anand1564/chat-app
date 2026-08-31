@@ -15,8 +15,10 @@ function App() {
       <Route path="/" element={<Home/>} />
       <Route path="/signup" element={<Signup/>} />
       <Route path="/login" element={<Login/>} />
-      <Route path="/chatRoom/:id" element={<ChatRoom/>} />
-      <Route path="/videoChat" element={<VideoChat roomId='1'/>} />
+      <Route path="/chatRoom" element={<ChatRoom/>} />
+      <Route path="/chatRoom/:inviteCode" element={<ChatRoom/>} />
+      <Route path="/video-chat" element={<VideoChat/>} />
+      <Route path="/videoChat" element={<VideoChat/>} />
     </Routes>
     </BrowserRouter>
     </AuthProvider>

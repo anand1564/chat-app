@@ -1,9 +1,10 @@
 
 import { Users, Video, Zap, Shield, Globe, MessageSquare } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Navbar from './ui/Navbar';
 const Home = () => {
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-black text-green-700">
       {/* Grid Background Pattern */}
       <div 
         className="absolute inset-0 w-full h-full"
@@ -17,30 +18,21 @@ const Home = () => {
       {/* Hero Section */}
       <div className="relative">
         <div className="container mx-auto px-4 pt-20 pb-16 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold text-green-700 mb-6">
             Connect Instantly with Anyone, Anywhere
           </h1>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-green-700 mb-8 max-w-2xl mx-auto">
             Experience seamless communication with our feature-rich chat platform that brings people together.
           </p>
-          
-          {/* Hero Image/Video Container */}
-          <div className="max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl">
-            <img
-              src="/api/placeholder/800/500"
-              alt="Chat App Demo"
-              className="w-full h-auto"
-            />
+          <div className="mx-auto mb-12 grid max-w-3xl gap-4 sm:grid-cols-2">
+            <Link to="/chatRoom" className="rounded-2xl bg-green-200 px-8 py-5 text-lg font-semibold text-black transition-colors hover:bg-green-500">Create a chat room</Link>
+            <Link to="/video-chat" className="rounded-2xl border border-green-500 px-8 py-5 text-lg font-semibold text-green-300 transition-colors hover:bg-green-950">Start random video chat</Link>
           </div>
-          
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors">
-            Get Started Free
-          </button>
         </div>
       </div>
 
       {/* Features Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32 text-white dark:bg-gray-800">
+      <section className="w-full py-12 md:py-24 lg:py-32 text-green-700 dark:bg-gray-800">
         <div className="container mx-auto px-4 md:px-6 max-w-7xl">
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">
             Key Features
@@ -90,6 +82,10 @@ const Home = () => {
             </div>
           </div>
         </div>
+      </section>
+      {/* How to get started */}
+      <section className="">
+        <div className='flex flex-col items-center justify-center'></div>
       </section>
     </div>
   );

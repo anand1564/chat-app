@@ -1,321 +1,114 @@
-import  { useState, useEffect, useRef } from 'react';
-import io from 'socket.io-client';
-import Peer from 'simple-peer';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import io, { Socket } from 'socket.io-client';
 
-const socket = io('http://localhost:3000');
+const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000';
+type Room = { id: number; name: string; inviteCode: string; createdAt: string };
+type ChatMessage = { text: string; sender: string; sentAt: string; socketId: string };
 
-const ChatRoom: React.FC = () => {
+const ChatRoom = () => {
+  const { inviteCode } = useParams();
   const [roomName, setRoomName] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState(() => sessionStorage.getItem('chat-display-name') ?? 'Guest');
+  const [room, setRoom] = useState<Room | null>(null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Array<{text: string, sender: 'me' | 'other', timestamp: Date}>>([]); 
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [peers, setPeers] = useState<{ [key: string]: Peer.Instance }>({});
-  const [isJoined, setIsJoined] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-
-  const myVideo = useRef<HTMLVideoElement>(null);
-  const peersRef = useRef<{ [key: string]: Peer.Instance }>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [people, setPeople] = useState(0);
+  const [error, setError] = useState('');
+  const [loadingInvite, setLoadingInvite] = useState(Boolean(inviteCode));
+  const [copied, setCopied] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      setLocalStream(stream);
-      if (myVideo.current) myVideo.current.srcObject = stream;
-    }).catch(err => {
-      console.error("Error accessing media devices:", err);
-      alert("Please allow camera and microphone access to use the video chat feature");
-    });
+    const socket = io(SERVER_URL);
+    socketRef.current = socket;
+    socket.on('room:message', (incoming: ChatMessage) => setMessages((previous) => [...previous, incoming]));
+    socket.on('room:presence', setPeople);
+    socket.on('room:error', setError);
+    return () => { socket.disconnect(); };
+  }, []);
 
-    socket.on('user-connected', (userId) => {
-      if (!localStream) return;
-      const peer = new Peer({ initiator: true, stream: localStream });
-      peer.on('signal', (signal) => {
-        socket.emit('signal', userId, signal);
-      });
-      peersRef.current[userId] = peer;
-      setPeers({ ...peersRef.current });
-    });
+  useEffect(() => { messageEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-    socket.on('receive-signal', (signal) => {
-      if (!localStream) return;
-      const peer = new Peer({ initiator: false, stream: localStream });
-      peer.on('signal', (signal) => {
-        socket.emit('return-signal', signal);
-      });
-      peer.signal(signal);
-      peersRef.current[signal.id] = peer;
-      setPeers({ ...peersRef.current });
-    });
-
-    socket.on('receive-message', (text) => {
-      setMessages((prev) => [...prev, {text, sender: 'other', timestamp: new Date()}]);
-    });
-
+  useEffect(() => {
+    if (!room || !socketRef.current) return;
+    const join = () => socketRef.current?.emit('room:join', { roomId: room.id, inviteCode: room.inviteCode });
+    if (socketRef.current.connected) join();
+    socketRef.current.on('connect', join);
     return () => {
-      localStream?.getTracks().forEach(track => track.stop());
-      socket.disconnect();
+      socketRef.current?.emit('room:leave', room.id);
+      socketRef.current?.off('connect', join);
     };
-  }, [localStream]);
+  }, [room]);
 
-  // Auto-scroll to bottom of messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!inviteCode) return;
+    let active = true;
+    fetch(`${SERVER_URL}/rooms/invite/${encodeURIComponent(inviteCode)}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? 'Unable to open this room.');
+        return data as Room;
+      })
+      .then((data) => { if (active) { setRoom(data); setRoomName(data.name); } })
+      .catch((reason: Error) => active && setError(reason.message))
+      .finally(() => active && setLoadingInvite(false));
+    return () => { active = false; };
+  }, [inviteCode]);
 
-  const createRoom = async () => {
-    if (!roomName.trim()) {
-      alert("Please enter a room name");
-      return;
-    }
-    
-    try {
-      const response = await fetch('http://localhost:3000/rooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: roomName, password }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create room');
-      }
-      
-      const data = await response.json();
-      setRoomId(data.id);
-      socket.emit('join-room', data.id);
-      setIsJoined(true);
-    } catch (error) {
-      console.error("Error creating room:", error);
-      alert("Failed to create room. Please try again.");
-    }
+  const saveName = () => {
+    const name = displayName.trim().slice(0, 40) || 'Guest';
+    setDisplayName(name);
+    sessionStorage.setItem('chat-display-name', name);
+    return name;
   };
 
-  const joinRoom = async () => {
-    if (!roomName.trim()) {
-      alert("Please enter a room name");
-      return;
-    }
-    
-    try {
-      const response = await fetch('http://localhost:3000/room/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: roomName, password }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to join room');
-      }
-      
-      const data = await response.json();
-      setRoomId(data.id);
-      socket.emit('join-room', data.id);
-      setIsJoined(true);
-    } catch (error) {
-      console.error("Error joining room:", error);
-      alert("Failed to join room. Please check room name and password.");
-    }
+  const requestRoom = async (path: string, payload: object) => {
+    setError('');
+    const response = await fetch(`${SERVER_URL}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? 'Unable to enter the room.');
+    return data as Room;
   };
 
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || !roomId) return;
-    
-    socket.emit('send-message', roomId, message);
-    setMessages((prev) => [...prev, {text: message, sender: 'me', timestamp: new Date()}]);
+  const createRoom = async (event: FormEvent) => {
+    event.preventDefault();
+    try { setRoom(await requestRoom('/rooms', { name: roomName, password })); saveName(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create the room.'); }
+  };
+
+  const joinWithPassword = async () => {
+    try { setRoom(await requestRoom('/rooms/join', { name: roomName, password })); saveName(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to join the room.'); }
+  };
+
+  const sendMessage = (event: FormEvent) => {
+    event.preventDefault();
+    const text = message.trim();
+    if (!text || !room) return;
+    socketRef.current?.emit('room:message', room.id, { text, sender: saveName(), sentAt: new Date().toISOString() });
     setMessage('');
   };
 
-  const toggleAudio = () => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsAudioMuted(!isAudioMuted);
-    }
+  const copyInvite = async () => {
+    if (!room) return;
+    await navigator.clipboard.writeText(`${window.location.origin}/chatRoom/${room.inviteCode}`);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   };
 
-  const toggleVideo = () => {
-    if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff(!isVideoOff);
-    }
-  };
+  if (loadingInvite) return <div className="grid min-h-screen place-items-center bg-slate-950 text-slate-300">Opening your room…</div>;
 
-  const leaveRoom = () => {
-    socket.emit('leave-room', roomId);
-    setRoomId(null);
-    setIsJoined(false);
-    setMessages([]);
-  };
-
-  return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-indigo-600 text-white p-4 shadow-md">
-        <h1 className="text-2xl font-bold">Video Chat Room</h1>
-        {roomId && <p className="text-sm opacity-75">Room: {roomName}</p>}
-      </header>
-
-      <main className="flex flex-col md:flex-row flex-grow overflow-hidden">
-        {!isJoined ? (
-          // Join/Create Room Form
-          <div className="flex items-center justify-center w-full p-8">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4 text-center">Join or Create a Room</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Room Name</label>
-                  <input
-                    type="text"
-                    placeholder="Enter room name"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password (Optional)</label>
-                  <input
-                    type="password"
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div className="flex gap-4 pt-2">
-                  <button 
-                    onClick={createRoom}
-                    className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  >
-                    Create Room
-                  </button>
-                  <button 
-                    onClick={joinRoom}
-                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                  >
-                    Join Room
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Chat Room UI
-          <>
-            {/* Video Area */}
-            <div className="md:w-3/5 p-4 flex flex-col">
-              <div className="bg-black rounded-lg overflow-hidden flex-grow relative">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 h-full">
-                  <div className="relative">
-                    <video 
-                      ref={myVideo} 
-                      autoPlay 
-                      muted 
-                      className="w-full h-full object-cover rounded" 
-                    />
-                    <div className="absolute bottom-2 left-2 bg-gray-800 text-white px-2 py-1 text-xs rounded">
-                      You
-                    </div>
-                  </div>
-                  
-                  {Object.keys(peers).map((peerId) => (
-                    <div key={peerId} className="relative">
-                      <video 
-                        autoPlay 
-                        ref={(ref) => ref && (ref.srcObject = peers[peerId].streams[0])} 
-                        className="w-full h-full object-cover rounded"
-                      />
-                      <div className="absolute bottom-2 left-2 bg-gray-800 text-white px-2 py-1 text-xs rounded">
-                        Participant
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Controls */}
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4">
-                  <button 
-                    onClick={toggleAudio} 
-                    className={`p-3 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-700'} text-white`}
-                  >
-                    {isAudioMuted ? 'Unmute' : 'Mute'}
-                  </button>
-                  <button 
-                    onClick={toggleVideo} 
-                    className={`p-3 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-700'} text-white`}
-                  >
-                    {isVideoOff ? 'Show Video' : 'Hide Video'}
-                  </button>
-                  <button 
-                    onClick={leaveRoom} 
-                    className="p-3 rounded-full bg-red-600 text-white"
-                  >
-                    Leave
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {/* Chat Area */}
-            <div className="md:w-2/5 border-t md:border-t-0 md:border-l border-gray-300 flex flex-col bg-white">
-              <div className="p-4 border-b border-gray-300">
-                <h2 className="font-semibold text-lg">Chat</h2>
-              </div>
-              
-              <div className="flex-grow overflow-y-auto p-4 space-y-3">
-                {messages.length === 0 ? (
-                  <p className="text-gray-500 text-center italic">No messages yet</p>
-                ) : (
-                  messages.map((msg, index) => (
-                    <div 
-                      key={index} 
-                      className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`max-w-xs px-4 py-2 rounded-lg ${
-                          msg.sender === 'me' 
-                            ? 'bg-indigo-600 text-white' 
-                            : 'bg-gray-200 text-gray-800'
-                        }`}
-                      >
-                        <p>{msg.text}</p>
-                        <p className={`text-xs ${msg.sender === 'me' ? 'text-indigo-200' : 'text-gray-500'} text-right mt-1`}>
-                          {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-              
-              <form onSubmit={sendMessage} className="p-4 border-t border-gray-300 flex">
-                <input
-                  type="text"
-                  placeholder="Type a message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="flex-grow px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button 
-                  type="submit"
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  Send
-                </button>
-              </form>
-            </div>
-          </>
-        )}
-      </main>
+  if (!room) return <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+    <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-[1.1fr_.9fr]">
+      <section className="rounded-3xl bg-gradient-to-br from-cyan-500/20 via-slate-900 to-slate-900 p-8 ring-1 ring-cyan-400/20"><p className="mb-3 text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Private group chat</p><h1 className="text-4xl font-bold">Make a room. Share one link. Talk live.</h1><p className="mt-5 max-w-lg text-slate-300">Create a password-protected room for your group, or invite people with a unique link. Messages appear instantly for everyone in the room.</p><Link to="/video-chat" className="mt-8 inline-block rounded-xl border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:bg-slate-800">Try random video chat →</Link></section>
+      <section className="rounded-3xl bg-white p-7 text-slate-900 shadow-2xl"><h2 className="text-2xl font-bold">Enter a chat room</h2><p className="mt-1 text-sm text-slate-500">Use a room name and password, or open an invite link.</p>{error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}<form onSubmit={createRoom} className="mt-6 space-y-4"><label className="block text-sm font-medium">Your display name<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} className="mt-1 w-full rounded-lg border p-3" required /></label><label className="block text-sm font-medium">Room name<input value={roomName} onChange={(e) => setRoomName(e.target.value)} maxLength={80} className="mt-1 w-full rounded-lg border p-3" placeholder="Friday movie night" required /></label><label className="block text-sm font-medium">Room password <span className="font-normal text-slate-400">(optional when using the link)</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="password" className="mt-1 w-full rounded-lg border p-3" placeholder="Set a password" /></label><div className="grid grid-cols-2 gap-3"><button type="submit" className="rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-700">Create room</button><button type="button" onClick={joinWithPassword} className="rounded-xl border border-slate-300 px-4 py-3 font-semibold hover:bg-slate-100">Join room</button></div></form></section>
     </div>
-  );
+  </main>;
+
+  return <main className="min-h-screen bg-slate-950 px-4 py-6 text-white"><div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl"><header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-5 py-4"><div><p className="text-sm text-cyan-300">Live room · {people} {people === 1 ? 'person' : 'people'} here</p><h1 className="text-2xl font-bold">{room.name}</h1></div><div className="flex gap-2"><button onClick={copyInvite} className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300">{copied ? 'Invite copied!' : 'Copy invite link'}</button><Link to="/chatRoom" className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800">Leave</Link></div></header><section className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto p-5">{messages.length === 0 && <div className="grid h-full place-items-center text-center text-slate-500"><p>Share the invite link to start chatting.</p></div>}{messages.map((item, index) => <article key={`${item.socketId}-${item.sentAt}-${index}`} className="max-w-xl rounded-2xl bg-slate-800 px-4 py-3"><div className="mb-1 flex gap-2 text-sm"><strong className="text-cyan-300">{item.sender}</strong><time className="text-slate-500">{new Date(item.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div><p className="break-words text-slate-100">{item.text}</p></article>)}<div ref={messageEndRef} /></div><form onSubmit={sendMessage} className="flex gap-3 border-t border-slate-800 p-4"><input value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-400 focus:ring-2" placeholder="Write a message…" /><button className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-300">Send</button></form></section></div></main>;
 };
 
 export default ChatRoom;

@@ -14,16 +14,16 @@ interface CreateMessageRequest extends Request {
 
 // GET route to fetch messages by chatRoom
 router.get('/:chatRoomId', async (req: Request, res: Response) => {
-    const { chatRoomId } = req.params;
+    const chatRoomId = Number(req.params.chatRoomId);
 
-    if (!chatRoomId) {
+    if (!Number.isInteger(chatRoomId)) {
         return res.status(400).json({ error: "chatRoom is required" });
     }
 
     try {
         const messages: Message[] = await prisma.message.findMany({
             where: {
-                chatRoomId: chatRoomId as string,  
+                chatRoomId,
             }
         });
 
@@ -35,10 +35,10 @@ router.get('/:chatRoomId', async (req: Request, res: Response) => {
 });
 
 router.post('/create/:roomId', async (req: CreateMessageRequest, res: Response) => {
-    const {roomId} = req.params;
+    const roomId = Number(req.params.roomId);
     const { sender, content } = req.body;
 
-    if ( !sender || !content) {
+    if (!Number.isInteger(roomId) || !sender || !content) {
         return res.status(400).json({ error: "chatRoom, sender, and content are required" });
     }
 
